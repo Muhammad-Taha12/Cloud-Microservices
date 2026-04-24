@@ -1,154 +1,206 @@
-# Microservices
-## Project Overview
-This project is a microservices-based event booking system that allows users to:
+# EventSphere — Microservices Deployment
 
-Register and log in (Users Service). \
-Browse and manage events (Events Service). \
-Create bookings (Booking Service). \
-Receive notifications when a booking is confirmed (Notification Service via RabbitMQ). \
-View a React frontend that ties it all together.
+A microservices-based Event Booking System deployed using Docker, Terraform, Ansible, Kubernetes, and ArgoCD.
 
-## Architecture
-React Frontend (Users/frontend)
+## Services
 
-Built with Create React App. \
-Communicates with the microservices via REST. \
-Displays user data, events, and booking info. \
-Users Service (Users/backend)
+| Service | Port |
+|---|---|
+| Users Backend | 5000 |
+| Events Backend | 5001 |
+| Booking Backend | 5002 |
+| Notifications Backend | 5003 |
+| Frontend | 80 |
+| PostgreSQL | 5432 |
+| RabbitMQ | 5672 |
 
-## Endpoints:
-POST /register \
-POST /login \
-GET /dashboard (protected) \
-Database: PostgreSQL (table: users) \
-Events Service (Events/backend)
+---
 
-## Endpoints:
-GET /events (list all events) \
-POST /events (add new event) \
-GET /events/:eventId/availability (check availability) \
-DELETE /events/:id (delete event) \
-Database: PostgreSQL (table: events) \
-Booking Service (Booking/backend)
+## Local Deployment (WSL2)
 
-## Endpoints:
-GET /bookings (list all bookings) \
-POST /bookings (create a new booking, checks event availability) \
-PATCH /bookings/:id (update booking status) \
-Database: PostgreSQL (table: bookings) \
-Publishes to RabbitMQ queue booking_confirmed when a booking is confirmed \
-Notification Service (Notifications/backend)
+### 1. Prerequisites
+- Windows with WSL2 (Ubuntu 22.04)
+- systemd enabled in `/etc/wsl.conf` (`[boot] systemd=true`)
+- Docker Desktop installed
 
-Consumes messages from the booking_confirmed queue in RabbitMQ. \
-Sends a “confirmation email”.
-
-## RabbitMQ
-Acts as the message broker for asynchronous communication between the Booking Service and Notification Service.
-
-# API Endpoints (High-Level)
-## Users Service
-POST /register \
-Request Body: { "username": "string", "password": "string" } \
-Creates a new user in the database.
-
-POST /login \
-Request Body: { "username": "string", "password": "string" } \
-Returns a JWT token on successful authentication.
-
-GET /dashboard \
-Requires Authorization header with JWT. \
-Returns user info if token is valid. \
-Events Service
-
-GET /events \
-Returns a list of events (id, name, availability).
-
-POST /events \
-Request Body: { "name": "string", "availability": "boolean" } \
-Inserts a new event into the database.
-
-GET /events/:eventId/availability \
-Returns { "availability": boolean } for a specific event.
-
-DELETE /events/:id \
-Deletes the specified event.
-
-## Booking Service
-GET /bookings\
-Returns a list of all bookings.
-
-POST /bookings\
-Request Body: { "user_id": number, "event_id": number, "tickets": number }\
-Creates a new booking if the event is available. Publishes a “confirmed” event if booking already existed.
-
-PATCH /bookings/:id\
-Request Body: { "status": "pending|confirmed" }\
-Updates booking status. If confirmed, publishes an event to RabbitMQ.
-
-## Notification Service
-No direct REST endpoints.\
-Listens to the booking_confirmed queue.\
-Sends a confirmation email to the user.
-
-## Clone the Repository
-```
-git clone https://github.com/Muhammad-Taha12/Microservices.git
+### 2. Run Ansible (installs Docker, MicroK8s, ArgoCD)
+```bash
+sudo apt install ansible -y
+ansible-playbook -i ansible/inventory.ini ansible/site.yml
 ```
 
-## Install Dependencies
-For each microservice (Users/backend, Events/backend, Booking/backend, Notifications/backend) and the React frontend (Users/frontend), install dependencies:
+`inventory.ini` should target localhost:
+```ini
+[master]
+localhost ansible_connection=local
 
-```
-cd Users/backend
-npm install
-
-cd ../../Events/backend
-npm install
-
-cd ../../Booking/backend
-npm install
-
-cd ../../Notifications/backend
-npm install
-
-cd ../../Users/frontend
-npm install
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
 ```
 
-## Set Up PostgreSQL Databases
-Create databases for each microservice (e.g., users_db, events_db, bookings_db).
-```
-CREATE TABLE events (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  availability BOOLEAN NOT NULL
-);
+### 3. Verify MicroK8s
+```bash
+microk8s status --wait-ready
+microk8s kubectl get nodes
 ```
 
-## Set Up RabbitMQ
-Install and start RabbitMQ on port 5672.\
-No special queues are needed in advance; each service asserts its own queue.\
-Configure Environment Variables
+### 4. Build & Push Docker Images
+```bash
+# Trust local registry
+sudo mkdir -p /var/snap/microk8s/current/args/certs.d/localhost:32000
+sudo bash -c 'cat > /var/snap/microk8s/current/args/certs.d/localhost:32000/hosts.toml << EOF
+server = "http://localhost:32000"
 
-## Each backend typically has a .env file:
-DB_USER=postgres\
-DB_HOST=localhost\
-DB_DATABASE=events_db\
-DB_PASSWORD=secret\
-DB_PORT=5432
+[host."http://localhost:32000"]
+  capabilities = ["pull", "resolve"]
+EOF'
+microk8s stop && microk8s start && microk8s status --wait-ready
 
-## For the Users or Booking service:
-SECRET_KEY=some_secret_key \
-Run the Services
+# Build alpine images
+docker build -t localhost:32000/users:latest ./Users/backend/
+docker build -t localhost:32000/events:latest ./Events/backend/
+docker build -t localhost:32000/booking:latest ./Booking/backend/
+docker build -t localhost:32000/notifications:latest ./Notifications/backend/
+docker build -t localhost:32000/frontend:latest ./frontend/
 
-## You can use concurrently in the root folder to run everything from a single terminal:
+# Push to MicroK8s registry
+docker push localhost:32000/users:latest
+docker push localhost:32000/events:latest
+docker push localhost:32000/booking:latest
+docker push localhost:32000/notifications:latest
+docker push localhost:32000/frontend:latest
+
+# Verify
+curl http://localhost:32000/v2/_catalog
 ```
-npm run start:users
+
+### 5. Deploy to Kubernetes
+```bash
+microk8s kubectl apply -f k8s/
+microk8s kubectl get pods -n onlineeventbooking -w
 ```
 
-## Access the App
-The React frontend runs on http://localhost:3000. \
-The Users Service runs on http://localhost:5000, Events on http://localhost:5001, Booking on http://localhost:5002 and Notifications on http://localhost:5003.
+### 6. Access ArgoCD UI
+```bash
+# Get admin password
+microk8s kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d && echo
 
-cd "/mnt/d/Cloud Project 3/Cloud Microservices/"
-wsl.exe -d Ubuntu-22.04
+# Port-forward
+microk8s kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+Open **https://localhost:8080** — login with `admin` and the password above.
+
+### 7. Apply ArgoCD App Config
+```bash
+microk8s kubectl apply -f .argocd/application.yaml
+```
+
+---
+
+## AWS Deployment
+
+### 1. Configure AWS Credentials
+```bash
+aws configure
+aws sts get-caller-identity   # verify
+```
+
+### 2. Provision Infrastructure (Terraform)
+```bash
+cd terraform/
+terraform init
+terraform plan -var="key_name=eventsphere"
+terraform apply -var="key_name=eventsphere"
+# Note the output IPs for the next step
+```
+
+### 3. Update Ansible Inventory
+Replace IPs in `ansible/inventory.ini` with Terraform output:
+```ini
+[master]
+<master_public_ip> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/eventsphere.pem
+
+[workers]
+<worker1_public_ip> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/eventsphere.pem
+<worker2_public_ip> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/eventsphere.pem
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+```
+
+### 4. Run Ansible on EC2
+```bash
+chmod 400 ~/.ssh/eventsphere.pem
+ansible-playbook -i ansible/inventory.ini ansible/site.yml
+```
+
+### 5. Copy Manifests & Deploy
+```bash
+scp -i ~/.ssh/eventsphere.pem -r k8s/ ubuntu@<master_public_ip>:~/
+scp -i ~/.ssh/eventsphere.pem -r .argocd/ ubuntu@<master_public_ip>:~/
+
+ssh -i ~/.ssh/eventsphere.pem ubuntu@<master_public_ip>
+microk8s kubectl apply -f k8s/
+microk8s kubectl get pods -n onlineeventbooking -w
+```
+
+### 6. Access ArgoCD UI (via SSH tunnel)
+```bash
+# Run from your local machine
+ssh -i ~/.ssh/eventsphere.pem -L 8080:localhost:8080 ubuntu@<master_public_ip> \
+  "microk8s kubectl port-forward svc/argocd-server -n argocd 8080:443"
+```
+Open **https://localhost:8080** in your browser.
+
+### 7. Destroy When Done
+```bash
+cd terraform/
+terraform destroy -var="key_name=eventsphere"
+```
+> ⚠️ Always destroy after your demo to avoid AWS charges.
+
+---
+
+## CI/CD Pipeline (GitHub Actions + ArgoCD)
+
+On every push to `master`:
+1. GitHub Actions builds Docker images and pushes them to `ghcr.io`
+2. The workflow updates image tags in the k8s manifests and commits back
+3. ArgoCD detects the manifest change and syncs the cluster automatically
+
+### Requirements
+- Repo → **Settings → Actions → General → Workflow permissions → Read and write**
+- Repo → **Settings → Packages** → ensure GitHub Container Registry is enabled
+
+### Trigger manually
+```bash
+git add .
+git commit -m "trigger pipeline"
+git push origin master
+# Monitor at: https://github.com/<username>/<repo>/actions
+```
+
+---
+
+## Useful Commands
+
+```bash
+# All pods status
+microk8s kubectl get pods -n onlineeventbooking
+
+# Logs for a service
+microk8s kubectl logs deployment/user-service-deployment -n onlineeventbooking
+
+# All services and ports
+microk8s kubectl get svc -n onlineeventbooking
+
+# ArgoCD app sync status
+microk8s kubectl get application -n argocd
+
+# Verify images in registry
+curl http://localhost:32000/v2/_catalog
+
+# Clean up Docker
+docker system prune -f
+```
