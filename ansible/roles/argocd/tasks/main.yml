@@ -1,0 +1,44 @@
+---
+- name: Create argocd namespace
+  command: microk8s kubectl create namespace argocd --dry-run=client -o yaml | microk8s kubectl apply -f -
+  changed_when: false
+
+- name: Install ArgoCD
+  command: >
+    microk8s kubectl apply -n argocd
+    -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  changed_when: false
+
+- name: Wait for ArgoCD server to be ready
+  command: >
+    microk8s kubectl wait --for=condition=available
+    deployment/argocd-server -n argocd --timeout=300s
+  changed_when: false
+
+- name: Patch ArgoCD server service to NodePort
+  command: >
+    microk8s kubectl patch svc argocd-server -n argocd
+    -p '{"spec": {"type": "NodePort"}}'
+  changed_when: false
+
+- name: Get initial ArgoCD admin password
+  command: >
+    microk8s kubectl get secret argocd-initial-admin-secret
+    -n argocd -o jsonpath="{.data.password}"
+  register: argocd_password_b64
+  changed_when: false
+
+- name: Decode ArgoCD admin password
+  command: echo "{{ argocd_password_b64.stdout }}" | base64 -d
+  register: argocd_password
+  changed_when: false
+
+- name: Display ArgoCD admin password
+  debug:
+    msg: "ArgoCD admin password: {{ argocd_password.stdout }}"
+
+- name: Apply eventsphere ArgoCD application
+  command: >
+    microk8s kubectl apply -f /home/ubuntu/eventsphere/.argocd/application.yaml
+  changed_when: false
+  ignore_errors: true

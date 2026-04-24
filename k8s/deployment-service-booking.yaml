@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-service-deployment
+  namespace: OnlineEventBookingMuhammadTaha
+  labels:
+    app: Booking
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: Booking
+  template:
+    metadata:
+      labels:
+        app: Booking
+    spec:
+      containers:
+      - name: Booking
+        image: Booking:latest
+        ports:
+        - containerPort: 5002
+        env:
+          - name: PORT
+            value: "5002"
+          - name: DB_HOST
+            valueFrom:
+              configMapKeyRef:
+                name: eventsphere-config
+                key: DB_HOST
+          - name: DB_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: eventsphere-config
+                key: DB_PORT
+          - name: DB_DATABASE
+            valueFrom:
+              configMapKeyRef:
+                name: eventsphere-config
+                key: DB_DATABASE
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: eventsphere-secrets
+                key: DB_USER
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: eventsphere-secrets
+                key: DB_PASSWORD
+          # FIX: Proper service URLs instead of hardcoded localhost
+          - name: EVENT_SERVICE_URL
+            valueFrom:
+              configMapKeyRef:
+                name: eventsphere-config
+                key: EVENTS_API_URL
+          - name: RABBITMQ_URL
+            valueFrom:
+              configMapKeyRef:
+                name: eventsphere-config
+                key: RABBITMQ_URL
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-service
+  namespace: OnlineEventBookingMuhammadTaha
+spec:
+  selector:
+    app: Booking
+  ports:
+    - protocol: TCP
+      port: 5002
+      targetPort: 5002
+  type: ClusterIP

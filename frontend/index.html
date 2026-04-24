@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EventSphere — Online Event Booking</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #111118;
+      --bg3: #18181f;
+      --surface: #1e1e28;
+      --surface2: #25252f;
+      --border: rgba(255,255,255,0.08);
+      --accent: #e8b86d;
+      --accent2: #c47c35;
+      --accent-glow: rgba(232, 184, 109, 0.15);
+      --text: #f0ede8;
+      --text2: #9e9b94;
+      --text3: #6b6866;
+      --success: #4caf80;
+      --error: #e05a5a;
+      --warning: #e8b86d;
+      --radius: 12px;
+      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 80% 10%, rgba(232,184,109,0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 60% at 10% 80%, rgba(100,80,200,0.04) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── NOISE TEXTURE ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.4;
+    }
+
+    #app { position: relative; z-index: 2; }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 40px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(20px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+
+    .logo span { color: var(--text2); font-weight: 400; }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      padding: 6px 14px 6px 8px;
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    .user-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--bg);
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    .btn-primary:hover { background: #f5cb88; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(232,184,109,0.3); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+    .btn-danger {
+      background: rgba(224,90,90,0.15);
+      color: var(--error);
+      border: 1px solid rgba(224,90,90,0.25);
+    }
+    .btn-danger:hover { background: rgba(224,90,90,0.25); }
+
+    .btn-success {
+      background: rgba(76,175,128,0.15);
+      color: var(--success);
+      border: 1px solid rgba(76,175,128,0.25);
+    }
+    .btn-success:hover { background: rgba(76,175,128,0.25); }
+
+    .btn-sm { font-size: 12px; padding: 7px 14px; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+    /* ── LAYOUT ── */
+    .page {
+      display: none;
+      animation: fadeUp 0.3s ease;
+    }
+    .page.active { display: block; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── AUTH SCREEN ── */
+    .auth-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: var(--shadow), 0 0 0 1px rgba(232,184,109,0.05);
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .auth-logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 32px;
+      font-weight: 900;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .auth-subtitle {
+      font-size: 14px;
+      color: var(--text3);
+    }
+
+    .tab-bar {
+      display: flex;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 9px;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 7px;
+      cursor: pointer;
+      color: var(--text3);
+      transition: all 0.2s ease;
+    }
+    .tab.active {
+      background: var(--surface2);
+      color: var(--text);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    /* ── FORMS ── */
+    .form-group { margin-bottom: 18px; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    input, select {
+      width: 100%;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 11px 14px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: rgba(232,184,109,0.5);
+      box-shadow: 0 0 0 3px rgba(232,184,109,0.08);
+    }
+    input::placeholder { color: var(--text3); }
+
+    select option { background: var(--bg2); }
+
+    /* ── MAIN LAYOUT ── */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: calc(100vh - 65px);
+    }
+
+    .sidebar {
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      position: sticky;
+      top: 65px;
+      height: calc(100vh - 65px);
+      overflow-y: auto;
+    }
+
+    .sidebar-section {
+      padding: 0 12px;
+      margin-bottom: 24px;
+    }
+
+    .sidebar-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text3);
+      padding: 0 8px;
+      margin-bottom: 8px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+    .nav-item:hover { background: var(--surface); color: var(--text); }
+    .nav-item.active { background: var(--accent-glow); color: var(--accent); }
+
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .main-content { padding: 32px 40px; }
+
+    /* ── PAGE HEADER ── */
+    .page-header {
+      margin-bottom: 28px;
+    }
+
+    .page-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .page-desc { font-size: 14px; color: var(--text3); }
+
+    /* ── STATS ROW ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .stat-value { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--text); }
+    .stat-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+    /* ── CARDS & TABLES ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .card-body { padding: 20px 22px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text3);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    tbody tr:last-child { border-bottom: none; }
+
+    td {
+      padding: 12px 16px;
+      color: var(--text2);
+    }
+
+    td:first-child { color: var(--text); font-weight: 500; }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-available { background: rgba(76,175,128,0.15); color: var(--success); }
+    .badge-unavailable { background: rgba(224,90,90,0.12); color: var(--error); }
+    .badge-pending { background: rgba(232,184,109,0.15); color: var(--warning); }
+    .badge-confirmed { background: rgba(76,175,128,0.15); color: var(--success); }
+
+    /* ── FORM CARD ── */
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* ── ALERTS ── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .alert-error { background: rgba(224,90,90,0.12); color: var(--error); border: 1px solid rgba(224,90,90,0.25); }
+    .alert-success { background: rgba(76,175,128,0.12); color: var(--success); border: 1px solid rgba(76,175,128,0.25); }
+    .alert { display: none; }
+    .alert.visible { display: flex; }
+
+    /* ── SPINNER ── */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-row td {
+      text-align: center;
+      color: var(--text3);
+      padding: 32px;
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text3);
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-title { font-size: 15px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
+    .empty-desc { font-size: 13px; }
+
+    /* ── MONO DETAIL ── */
+    .mono { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text3); }
+
+    /* ── SECTION DIVIDER ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 24px 0;
+    }
+
+    /* ── GRID LAYOUT ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) {
+      .two-col { grid-template-columns: 1fr; }
+      .dashboard { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .main-content { padding: 20px; }
+      .topbar { padding: 16px 20px; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── AUTH SCREEN ── -->
+  <div class="page active" id="page-auth">
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="auth-logo">EventSphere</div>
+          <div class="auth-subtitle">Online event booking platform</div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab active" onclick="switchAuthTab('login')">Sign In</div>
+          <div class="tab" onclick="switchAuthTab('register')">Register</div>
+        </div>
+
+        <!-- LOGIN -->
+        <div id="auth-login">
+          <div id="login-alert" class="alert alert-error">⚠ <span id="login-alert-msg"></span></div>
+          <div id="login-success" class="alert alert-success">✓ <span id="login-success-msg"></span></div>
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="login-username" placeholder="your username" />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="login-password" placeholder="••••••••" />
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px" id="btn-login" onclick="doLogin()">
+            Sign In
+          </button>
+        </div>
+
+        <!-- REGISTER -->
+        <div id="auth-register" style="display:none">
+          <div id="register-alert" class="alert alert-error">⚠ <span id="register-alert-msg"></span></div>
+          <div id="register-success" class="alert alert-success">✓ <span id="register-success-msg"></span></div>
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="register-username" placeholder="choose a username" />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="register-password" placeholder="••••••••" />
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px" id="btn-register" onclick="doRegister()">
+            Create Account
+          </button>
+        </div>
+
+        <p style="text-align:center;font-size:12px;color:var(--text3);margin-top:20px">
+          Backend: Users :5000 · Events :5001 · Booking :5002
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MAIN APP ── -->
+  <div class="page" id="page-app">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="logo">Event<span>Sphere</span></div>
+      <div class="topbar-right">
+        <div class="user-pill">
+          <div class="user-avatar" id="user-avatar-initials">?</div>
+          <span id="topbar-username">—</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Dashboard Grid -->
+    <div class="dashboard">
+      <!-- Sidebar -->
+      <nav class="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-label">Navigation</div>
+          <button class="nav-item active" id="nav-overview" onclick="showSection('overview')">
+            <span class="nav-icon">◈</span> Overview
+          </button>
+          <button class="nav-item" id="nav-events" onclick="showSection('events')">
+            <span class="nav-icon">◇</span> Events
+          </button>
+          <button class="nav-item" id="nav-bookings" onclick="showSection('bookings')">
+            <span class="nav-icon">◈</span> My Bookings
+          </button>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Admin</div>
+          <button class="nav-item" id="nav-manage-events" onclick="showSection('manage-events')">
+            <span class="nav-icon">⊞</span> Manage Events
+          </button>
+          <button class="nav-item" id="nav-all-bookings" onclick="showSection('all-bookings')">
+            <span class="nav-icon">⊟</span> All Bookings
+          </button>
+        </div>
+      </nav>
+
+      <!-- Main Content -->
+      <main class="main-content">
+
+        <!-- ── OVERVIEW ── -->
+        <section id="section-overview" class="page active">
+          <div class="page-header">
+            <div class="page-title">Overview</div>
+            <div class="page-desc">Welcome back — here's a snapshot of the platform</div>
+          </div>
+
+          <div class="stats-row" id="stats-row">
+            <div class="stat-card">
+              <div class="stat-label">Total Events</div>
+              <div class="stat-value" id="stat-events">—</div>
+              <div class="stat-sub">across all categories</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Your Bookings</div>
+              <div class="stat-value" id="stat-bookings">—</div>
+              <div class="stat-sub">active reservations</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Available Events</div>
+              <div class="stat-value" id="stat-available">—</div>
+              <div class="stat-sub">open to booking</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Recent Events</div>
+              <button class="btn btn-ghost btn-sm" onclick="showSection('events')">View All</button>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>ID</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="overview-events-body">
+                <tr class="loading-row"><td colspan="4">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── EVENTS ── -->
+        <section id="section-events" style="display:none">
+          <div class="page-header">
+            <div class="page-title">Browse Events</div>
+            <div class="page-desc">Discover and book available events</div>
+          </div>
+
+          <div id="events-alert" class="alert alert-error">⚠ <span id="events-alert-msg"></span></div>
+          <div id="events-success" class="alert alert-success">✓ <span id="events-success-msg"></span></div>
+
+          <!-- Book Event Form -->
+          <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+              <div class="card-title">Book a Ticket</div>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Select Event</label>
+                  <select id="book-event-id">
+                    <option value="">— choose an event —</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Number of Tickets</label>
+                  <input type="number" id="book-tickets" placeholder="1" min="1" value="1" />
+                </div>
+              </div>
+              <button class="btn btn-primary" onclick="doBookEvent()">Book Now · $10/ticket</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">All Events</div>
+              <button class="btn btn-ghost btn-sm" onclick="loadEvents()">↻ Refresh</button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>Event Name</th><th>ID</th><th>Availability</th></tr>
+              </thead>
+              <tbody id="events-table-body">
+                <tr class="loading-row"><td colspan="3">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── MY BOOKINGS ── -->
+        <section id="section-bookings" style="display:none">
+          <div class="page-header">
+            <div class="page-title">My Bookings</div>
+            <div class="page-desc">Your personal booking history</div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Reservations</div>
+              <button class="btn btn-ghost btn-sm" onclick="loadMyBookings()">↻ Refresh</button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>Booking ID</th><th>Event ID</th><th>Tickets</th><th>Cost</th><th>Status</th></tr>
+              </thead>
+              <tbody id="my-bookings-body">
+                <tr class="loading-row"><td colspan="5">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── MANAGE EVENTS (ADMIN) ── -->
+        <section id="section-manage-events" style="display:none">
+          <div class="page-header">
+            <div class="page-title">Manage Events</div>
+            <div class="page-desc">Create and remove events from the platform</div>
+          </div>
+
+          <div id="manage-alert" class="alert alert-error">⚠ <span id="manage-alert-msg"></span></div>
+          <div id="manage-success" class="alert alert-success">✓ <span id="manage-success-msg"></span></div>
+
+          <div class="two-col">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Add New Event</div>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label>Event Name</label>
+                  <input type="text" id="new-event-name" placeholder="e.g. Jazz Festival 2025" />
+                </div>
+                <div class="form-group">
+                  <label>Initial Availability</label>
+                  <select id="new-event-availability">
+                    <option value="true">Available</option>
+                    <option value="false">Unavailable</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary" onclick="doCreateEvent()">Create Event</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Quick Stats</div>
+              </div>
+              <div class="card-body">
+                <div style="display:flex;flex-direction:column;gap:14px">
+                  <div>
+                    <div style="font-size:12px;color:var(--text3);margin-bottom:4px">API Endpoints</div>
+                    <div class="mono">GET  /events</div>
+                    <div class="mono">POST /events</div>
+                    <div class="mono">GET  /events/:id/availability</div>
+                    <div class="mono">DEL  /events/:id</div>
+                  </div>
+                  <div>
+                    <div style="font-size:12px;color:var(--text3);margin-bottom:4px">Port</div>
+                    <div class="mono">localhost:5001</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Event List</div>
+              <button class="btn btn-ghost btn-sm" onclick="loadManageEvents()">↻ Refresh</button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>Name</th><th>ID</th><th>Availability</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="manage-events-body">
+                <tr class="loading-row"><td colspan="4">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── ALL BOOKINGS (ADMIN) ── -->
+        <section id="section-all-bookings" style="display:none">
+          <div class="page-header">
+            <div class="page-title">All Bookings</div>
+            <div class="page-desc">Platform-wide booking management</div>
+          </div>
+
+          <div id="all-bookings-alert" class="alert alert-error">⚠ <span id="all-bookings-alert-msg"></span></div>
+          <div id="all-bookings-success" class="alert alert-success">✓ <span id="all-bookings-success-msg"></span></div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">All Reservations</div>
+              <button class="btn btn-ghost btn-sm" onclick="loadAllBookings()">↻ Refresh</button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>Booking ID</th><th>User ID</th><th>Event ID</th><th>Tickets</th><th>Cost</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="all-bookings-body">
+                <tr class="loading-row"><td colspan="7">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── CONFIGURATION ──
+  const API = {
+    users:    'http://localhost:5000',
+    events:   'http://localhost:5001',
+    bookings: 'http://localhost:5002',
+  };
+
+  // ── STATE ──
+  let state = {
+    token: localStorage.getItem('token') || null,
+    userId: localStorage.getItem('userId') ? parseInt(localStorage.getItem('userId')) : null,
+    username: localStorage.getItem('username') || null,
+  };
+
+  // ── INIT ──
+  window.onload = () => {
+    if (state.token) {
+      enterApp();
+    }
+  };
+
+  // ── AUTH TABS ──
+  function switchAuthTab(tab) {
+    document.getElementById('auth-login').style.display    = tab === 'login'    ? 'block' : 'none';
+    document.getElementById('auth-register').style.display = tab === 'register' ? 'block' : 'none';
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'register'));
+    });
+  }
+
+  // ── ALERTS ──
+  function showAlert(id, msg) {
+    const el = document.getElementById(id);
+    const msgEl = document.getElementById(id + '-msg');
+    if (el && msgEl) { msgEl.textContent = msg; el.classList.add('visible'); }
+  }
+  function hideAlert(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('visible');
+  }
+  function flashSuccess(id, msg) {
+    showAlert(id, msg);
+    setTimeout(() => hideAlert(id), 4000);
+  }
+
+  // ── LOGIN ──
+  async function doLogin() {
+    hideAlert('login-alert');
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    if (!username || !password) { showAlert('login-alert', 'Please enter username and password'); return; }
+
+    const btn = document.getElementById('btn-login');
+    btn.disabled = true; btn.textContent = 'Signing in…';
+
+    try {
+      const res = await fetch(`${API.users}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok) { showAlert('login-alert', data.error || 'Login failed'); return; }
+
+      state.token    = data.token;
+      state.userId   = data.id;
+      state.username = data.username || username;
+      localStorage.setItem('token', state.token);
+      localStorage.setItem('userId', state.userId);
+      localStorage.setItem('username', state.username);
+      enterApp();
+    } catch (e) {
+      showAlert('login-alert', 'Cannot connect to Users service (port 5000)');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
+  }
+
+  // ── REGISTER ──
+  async function doRegister() {
+    hideAlert('register-alert');
+    const username = document.getElementById('register-username').value.trim();
+    const password = document.getElementById('register-password').value;
+    if (!username || !password) { showAlert('register-alert', 'Please fill in all fields'); return; }
+
+    const btn = document.getElementById('btn-register');
+    btn.disabled = true; btn.textContent = 'Creating account…';
+
+    try {
+      const res = await fetch(`${API.users}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok) { showAlert('register-alert', data.error || 'Registration failed'); return; }
+      flashSuccess('register-success', `Account created! You can now sign in.`);
+      switchAuthTab('login');
+      document.getElementById('login-username').value = username;
+    } catch (e) {
+      showAlert('register-alert', 'Cannot connect to Users service (port 5000)');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Create Account';
+    }
+  }
+
+  // ── ENTER APP ──
+  function enterApp() {
+    document.getElementById('page-auth').classList.remove('active');
+    document.getElementById('page-app').classList.add('active');
+    document.getElementById('topbar-username').textContent = state.username || 'User';
+    const initials = (state.username || 'U')[0].toUpperCase();
+    document.getElementById('user-avatar-initials').textContent = initials;
+    loadOverview();
+  }
+
+  // ── LOGOUT ──
+  function doLogout() {
+    state = { token: null, userId: null, username: null };
+    localStorage.clear();
+    document.getElementById('page-app').classList.remove('active');
+    document.getElementById('page-auth').classList.add('active');
+  }
+
+  // ── SECTION NAV ──
+  const sectionNames = ['overview','events','bookings','manage-events','all-bookings'];
+
+  function showSection(name) {
+    sectionNames.forEach(s => {
+      const el = document.getElementById(`section-${s}`);
+      if (el) el.style.display = s === name ? 'block' : 'none';
+      const nav = document.getElementById(`nav-${s}`);
+      if (nav) nav.classList.toggle('active', s === name);
+    });
+    // trigger load
+    const loaders = {
+      'overview': loadOverview,
+      'events': loadEvents,
+      'bookings': loadMyBookings,
+      'manage-events': loadManageEvents,
+      'all-bookings': loadAllBookings,
+    };
+    if (loaders[name]) loaders[name]();
+  }
+
+  // ── API HELPERS ──
+  async function apiFetch(url, options = {}) {
+    if (state.token && !options.headers) options.headers = {};
+    if (state.token) options.headers['Authorization'] = `Bearer ${state.token}`;
+    const res = await fetch(url, options);
+    const data = await res.json();
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  // ── LOAD OVERVIEW ──
+  async function loadOverview() {
+    try {
+      const { data: events } = await apiFetch(`${API.events}/events`);
+      const { data: bookings } = await apiFetch(`${API.bookings}/bookings`);
+
+      const myBookings = Array.isArray(bookings) ? bookings.filter(b => b.user_id == state.userId) : [];
+      const availableEvents = Array.isArray(events) ? events.filter(e => e.availability) : [];
+
+      document.getElementById('stat-events').textContent   = Array.isArray(events)   ? events.length : '—';
+      document.getElementById('stat-bookings').textContent = myBookings.length;
+      document.getElementById('stat-available').textContent = availableEvents.length;
+
+      const tbody = document.getElementById('overview-events-body');
+      if (!Array.isArray(events) || events.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">No events yet</div><div class="empty-desc">Create events in Manage Events</div></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = events.slice(0, 5).map(e => `
+        <tr>
+          <td>${e.name}</td>
+          <td><span class="mono">#${e.id}</span></td>
+          <td><span class="badge ${e.availability ? 'badge-available' : 'badge-unavailable'}">${e.availability ? '● Available' : '○ Unavailable'}</span></td>
+          <td><button class="btn btn-primary btn-sm" onclick="quickBook(${e.id})">Book</button></td>
+        </tr>
+      `).join('');
+
+      // Populate event select
+      const sel = document.getElementById('book-event-id');
+      sel.innerHTML = '<option value="">— choose an event —</option>' +
+        events.map(e => `<option value="${e.id}" ${!e.availability ? 'disabled' : ''}>${e.name}${!e.availability ? ' (unavailable)' : ''}</option>`).join('');
+
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // ── LOAD EVENTS ──
+  async function loadEvents() {
+    const tbody = document.getElementById('events-table-body');
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="3">Loading…</td></tr>';
+    try {
+      const { data: events } = await apiFetch(`${API.events}/events`);
+      if (!Array.isArray(events) || events.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">No events</div></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = events.map(e => `
+        <tr>
+          <td>${e.name}</td>
+          <td><span class="mono">#${e.id}</span></td>
+          <td><span class="badge ${e.availability ? 'badge-available' : 'badge-unavailable'}">${e.availability ? '● Available' : '○ Unavailable'}</span></td>
+        </tr>
+      `).join('');
+
+      // Also update select
+      const sel = document.getElementById('book-event-id');
+      sel.innerHTML = '<option value="">— choose an event —</option>' +
+        events.map(e => `<option value="${e.id}" ${!e.availability ? 'disabled' : ''}>${e.name}${!e.availability ? ' (unavailable)' : ''}</option>`).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr class="loading-row"><td colspan="3">Failed to load events</td></tr>';
+    }
+  }
+
+  // ── QUICK BOOK FROM OVERVIEW ──
+  function quickBook(eventId) {
+    showSection('events');
+    document.getElementById('book-event-id').value = eventId;
+    document.getElementById('book-tickets').value = 1;
+  }
+
+  // ── BOOK EVENT ──
+  async function doBookEvent() {
+    hideAlert('events-alert'); hideAlert('events-success');
+    const event_id = document.getElementById('book-event-id').value;
+    const tickets  = parseInt(document.getElementById('book-tickets').value);
+    if (!event_id) { showAlert('events-alert', 'Please select an event'); return; }
+    if (!tickets || tickets < 1) { showAlert('events-alert', 'Please enter a valid ticket count'); return; }
+    if (!state.userId) { showAlert('events-alert', 'User ID not found — please sign in again'); return; }
+
+    try {
+      const { ok, data } = await apiFetch(`${API.bookings}/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: state.userId, event_id: parseInt(event_id), tickets })
+      });
+      if (!ok) { showAlert('events-alert', data.error || 'Booking failed'); return; }
+      flashSuccess('events-success', `Booking confirmed! ID #${data.id} — $${data.cost} total`);
+      loadEvents();
+    } catch(e) {
+      showAlert('events-alert', 'Cannot connect to Bookings service (port 5002)');
+    }
+  }
+
+  // ── MY BOOKINGS ──
+  async function loadMyBookings() {
+    const tbody = document.getElementById('my-bookings-body');
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="5">Loading…</td></tr>';
+    try {
+      const { data: bookings } = await apiFetch(`${API.bookings}/bookings`);
+      const mine = Array.isArray(bookings) ? bookings.filter(b => b.user_id == state.userId) : [];
+      if (mine.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">◈</div><div class="empty-title">No bookings yet</div><div class="empty-desc">Head to Events to make your first booking</div></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = mine.map(b => `
+        <tr>
+          <td><span class="mono">#${b.id}</span></td>
+          <td><span class="mono">Event #${b.event_id}</span></td>
+          <td>${b.tickets}</td>
+          <td>$${b.cost}</td>
+          <td><span class="badge ${b.status === 'confirmed' ? 'badge-confirmed' : 'badge-pending'}">${b.status}</span></td>
+        </tr>
+      `).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr class="loading-row"><td colspan="5">Failed to load bookings</td></tr>';
+    }
+  }
+
+  // ── MANAGE EVENTS ──
+  async function loadManageEvents() {
+    const tbody = document.getElementById('manage-events-body');
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="4">Loading…</td></tr>';
+    try {
+      const { data: events } = await apiFetch(`${API.events}/events`);
+      if (!Array.isArray(events) || events.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">⊞</div><div class="empty-title">No events</div></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = events.map(e => `
+        <tr>
+          <td>${e.name}</td>
+          <td><span class="mono">#${e.id}</span></td>
+          <td><span class="badge ${e.availability ? 'badge-available' : 'badge-unavailable'}">${e.availability ? 'Available' : 'Unavailable'}</span></td>
+          <td>
+            <button class="btn btn-danger btn-sm" onclick="doDeleteEvent(${e.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr class="loading-row"><td colspan="4">Failed to load events</td></tr>';
+    }
+  }
+
+  async function doCreateEvent() {
+    hideAlert('manage-alert'); hideAlert('manage-success');
+    const name = document.getElementById('new-event-name').value.trim();
+    const availability = document.getElementById('new-event-availability').value === 'true';
+    if (!name) { showAlert('manage-alert', 'Please enter an event name'); return; }
+    try {
+      const { ok, data } = await apiFetch(`${API.events}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, availability })
+      });
+      if (!ok) { showAlert('manage-alert', data.error || 'Failed to create event'); return; }
+      document.getElementById('new-event-name').value = '';
+      flashSuccess('manage-success', `Event "${data.name}" created with ID #${data.id}`);
+      loadManageEvents();
+    } catch(e) {
+      showAlert('manage-alert', 'Cannot connect to Events service (port 5001)');
+    }
+  }
+
+  async function doDeleteEvent(id) {
+    if (!confirm(`Delete event #${id}?`)) return;
+    try {
+      const { ok, data } = await apiFetch(`${API.events}/events/${id}`, { method: 'DELETE' });
+      if (!ok) { showAlert('manage-alert', data.error || 'Delete failed'); return; }
+      flashSuccess('manage-success', `Event #${id} deleted`);
+      loadManageEvents();
+    } catch(e) {
+      showAlert('manage-alert', 'Cannot connect to Events service');
+    }
+  }
+
+  // ── ALL BOOKINGS ──
+  async function loadAllBookings() {
+    const tbody = document.getElementById('all-bookings-body');
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="7">Loading…</td></tr>';
+    try {
+      const { data: bookings } = await apiFetch(`${API.bookings}/bookings`);
+      if (!Array.isArray(bookings) || bookings.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">⊟</div><div class="empty-title">No bookings</div></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = bookings.map(b => `
+        <tr>
+          <td><span class="mono">#${b.id}</span></td>
+          <td><span class="mono">U#${b.user_id}</span></td>
+          <td><span class="mono">E#${b.event_id}</span></td>
+          <td>${b.tickets}</td>
+          <td>$${b.cost}</td>
+          <td><span class="badge ${b.status === 'confirmed' ? 'badge-confirmed' : 'badge-pending'}">${b.status}</span></td>
+          <td>
+            ${b.status !== 'confirmed'
+              ? `<button class="btn btn-success btn-sm" onclick="doConfirmBooking(${b.id})">Confirm</button>`
+              : `<span style="color:var(--text3);font-size:12px">Confirmed ✓</span>`
+            }
+          </td>
+        </tr>
+      `).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr class="loading-row"><td colspan="7">Failed to load bookings</td></tr>';
+    }
+  }
+
+  async function doConfirmBooking(id) {
+    hideAlert('all-bookings-alert'); hideAlert('all-bookings-success');
+    try {
+      const { ok, data } = await apiFetch(`${API.bookings}/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'confirmed' })
+      });
+      if (!ok) { showAlert('all-bookings-alert', data.error || 'Failed to confirm'); return; }
+      flashSuccess('all-bookings-success', `Booking #${id} confirmed — RabbitMQ notification sent`);
+      loadAllBookings();
+    } catch(e) {
+      showAlert('all-bookings-alert', 'Cannot connect to Bookings service');
+    }
+  }
+
+  // ── ENTER KEY SUPPORT ──
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const loginPage = document.getElementById('auth-login');
+      const registerPage = document.getElementById('auth-register');
+      if (loginPage && loginPage.style.display !== 'none') doLogin();
+      else if (registerPage && registerPage.style.display !== 'none') doRegister();
+    }
+  });
+</script>
+</body>
+</html>

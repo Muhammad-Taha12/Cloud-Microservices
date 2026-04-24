@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-service-deployment
+  namespace: OnlineEventBookingMuhammadTaha
+  labels:
+    app: Events
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: Events
+  template:
+    metadata:
+      labels:
+        app: Events
+    spec:
+      containers:
+      - name: Events
+        image: Events:latest
+        ports:
+        - containerPort: 5001
+        env:
+          - name: PORT
+            value: "5001"
+          - name: DATABASE_URL
+            value: "postgres://postgres:Pass123@postgres:5432/devops"
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-service
+  namespace: OnlineEventBookingMuhammadTaha
+spec:
+  selector:
+    app: Events
+  ports:
+    - protocol: TCP
+      port: 5001
+      targetPort: 5001
+  type: ClusterIP

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-service-deployment
+  namespace: OnlineEventBookingMuhammadTaha
+  labels:
+    app: Frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: Frontend
+  template:
+    metadata:
+      labels:
+        app: Frontend
+    spec:
+      containers:
+      - name: Frontend
+        image: Frontend:latest
+        ports:
+        # FIX: nginx serves on port 80, not 5000
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: OnlineEventBookingMuhammadTaha
+spec:
+  selector:
+    app: Frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer

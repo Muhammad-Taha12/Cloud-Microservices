@@ -1,0 +1,19 @@
+---
+- name: Configure all nodes
+  hosts: all
+  become: true
+  roles:
+    - common
+    - docker
+
+- name: Configure MicroK8s master
+  hosts: master
+  become: true
+  roles:
+    - microk8s
+
+- name: Install ArgoCD on master
+  hosts: master
+  become: true
+  roles:
+    - argocd

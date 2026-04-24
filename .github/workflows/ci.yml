@@ -1,0 +1,95 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/eventsphere
+
+jobs:
+  # ── BUILD & PUSH DOCKER IMAGES ──
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        service:
+          - { name: users,         context: ./Users/backend,         port: 5000 }
+          - { name: events,        context: ./Events/backend,        port: 5001 }
+          - { name: booking,       context: ./Booking/backend,       port: 5002 }
+          - { name: notifications, context: ./Notifications/backend, port: 5003 }
+          - { name: frontend,      context: ./frontend,              port: 80   }
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # ── UPDATE K8S MANIFESTS WITH NEW IMAGE TAGS ──
+  update-manifests:
+    name: Update Kubernetes Manifests
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update image tags in k8s manifests
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          IMAGE_TAG="sha-${SHORT_SHA}"
+
+          for manifest in k8s/deployment-service-*.yaml; do
+            service=$(basename $manifest | sed 's/deployment-service-//' | sed 's/.yaml//')
+            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${service}:${IMAGE_TAG}"
+            sed -i "s|image: ${service}:.*|image: ${IMAGE}|g" $manifest
+            echo "Updated $manifest with image $IMAGE"
+          done
+
+          # Update frontend manifest
+          FRONTEND_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${IMAGE_TAG}"
+          sed -i "s|image: Frontend:.*|image: ${FRONTEND_IMAGE}|g" k8s/deployment-service-frontend.yaml
+
+      - name: Commit updated manifests
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add k8s/
+          git diff --staged --quiet || git commit -m "ci: update image tags to sha-$(echo ${{ github.sha }} | cut -c1-7) [skip ci]"
+          git push

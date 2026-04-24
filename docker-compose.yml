@@ -1,0 +1,116 @@
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Pass123
+      POSTGRES_DB: devops
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-service:
+    build: ./Users/backend
+    container_name: user-service
+    restart: always
+    env_file: ./Users/backend/.env
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
+  event-service:
+    build: ./Events/backend
+    container_name: event-service
+    restart: always
+    env_file: ./Events/backend/.env
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
+  booking-service:
+    build: ./Booking/backend
+    container_name: booking-service
+    restart: always
+    env_file: ./Booking/backend/.env
+    environment:
+      # FIX: use service name not localhost
+      EVENT_SERVICE_URL: http://event-service:5001
+      RABBITMQ_URL: amqp://rabbitmq
+    ports:
+      - "5002:5002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+
+  notification-service:
+    build: ./Notifications/backend
+    container_name: notification-service
+    restart: always
+    environment:
+      # FIX: use service name not localhost
+      RABBITMQ_URL: amqp://rabbitmq
+    ports:
+      - "5003:5003"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+
+  frontend-service:
+    build: ./frontend
+    container_name: frontend-service
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      # FIX: use service names not container names
+      - user-service
+      - event-service
+      - booking-service
+      - notification-service
+    networks:
+      - backend
+
+volumes:
+  pgdata:
+
+networks:
+  backend:
+    driver: bridge

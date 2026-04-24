@@ -1,0 +1,39 @@
+---
+- name: Install MicroK8s via snap
+  snap:
+    name: microk8s
+    classic: true
+    channel: "1.28/stable"
+
+- name: Add ubuntu user to microk8s group
+  user:
+    name: ubuntu
+    groups: microk8s
+    append: true
+
+- name: Wait for MicroK8s to be ready
+  command: microk8s status --wait-ready
+  changed_when: false
+  timeout: 120
+
+- name: Enable required MicroK8s addons
+  command: microk8s enable {{ item }}
+  loop:
+    - dns
+    - storage
+    - ingress
+    - registry
+  changed_when: false
+
+- name: Create kubectl alias
+  lineinfile:
+    path: /home/ubuntu/.bashrc
+    line: "alias kubectl='microk8s kubectl'"
+    create: true
+
+- name: Export kubeconfig for ubuntu user
+  shell: |
+    mkdir -p /home/ubuntu/.kube
+    microk8s config > /home/ubuntu/.kube/config
+    chown ubuntu:ubuntu /home/ubuntu/.kube/config
+  changed_when: false
