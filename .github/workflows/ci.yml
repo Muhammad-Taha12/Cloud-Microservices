@@ -62,7 +62,7 @@ jobs:
     name: Update Kubernetes Manifests
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
 
     steps:
       - name: Checkout repository
