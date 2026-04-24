@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend-service-deployment
-  namespace: OnlineEventBookingMuhammadTaha
+  namespace: onlineeventbooking
   labels:
     app: Frontend
 spec:
@@ -16,8 +16,8 @@ spec:
         app: Frontend
     spec:
       containers:
-      - name: Frontend
-        image: Frontend:latest
+      - name: frontend
+        image: localhost:32000/frontend:latest
         ports:
         # FIX: nginx serves on port 80, not 5000
         - containerPort: 80
@@ -33,7 +33,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend-service
-  namespace: OnlineEventBookingMuhammadTaha
+  namespace: onlineeventbooking
 spec:
   selector:
     app: Frontend

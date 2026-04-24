@@ -1,9 +1,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  # Using consistent name referenced by all deployments
   name: eventsphere-config
-  namespace: OnlineEventBookingMuhammadTaha
+  namespace: onlineeventbooking
 data:
   DB_HOST: "postgres"
   DB_PORT: "5432"
@@ -14,7 +13,6 @@ data:
   BOOKING_API_URL: "http://booking-service:5002"
   NOTIFICATIONS_API_URL: "http://notification-service:5003"
 
-  # FIX: Added RABBITMQ_URL used by booking & notification services
   RABBITMQ_URL: "amqp://rabbitmq"
   RABBITMQ_HOST: "rabbitmq"
   RABBITMQ_PORT: "5672"

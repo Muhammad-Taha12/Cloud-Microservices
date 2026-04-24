@@ -1,4 +1,4 @@
-FROM node:18
+FROM node:18-alpine
 # Giving some errors related to bcrypt when use node:18-alpine
 
 # Set working directory

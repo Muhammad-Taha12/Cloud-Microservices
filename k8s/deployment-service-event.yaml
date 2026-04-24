@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: event-service-deployment
-  namespace: OnlineEventBookingMuhammadTaha
+  namespace: onlineeventbooking
   labels:
     app: Events
 spec:
@@ -16,8 +16,8 @@ spec:
         app: Events
     spec:
       containers:
-      - name: Events
-        image: Events:latest
+      - name: events
+        image: localhost:32000/events:latest
         ports:
         - containerPort: 5001
         env:
@@ -37,7 +37,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: event-service
-  namespace: OnlineEventBookingMuhammadTaha
+  namespace: onlineeventbooking
 spec:
   selector:
     app: Events

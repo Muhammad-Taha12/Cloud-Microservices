@@ -149,3 +149,6 @@ npm run start:users
 ## Access the App
 The React frontend runs on http://localhost:3000. \
 The Users Service runs on http://localhost:5000, Events on http://localhost:5001, Booking on http://localhost:5002 and Notifications on http://localhost:5003.
+
+cd "/mnt/d/Cloud Project 3/Cloud Microservices/"
+wsl.exe -d Ubuntu-22.04

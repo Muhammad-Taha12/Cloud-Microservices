@@ -1,7 +1,12 @@
 ---
 - name: Create argocd namespace
-  command: microk8s kubectl create namespace argocd --dry-run=client -o yaml | microk8s kubectl apply -f -
-  changed_when: false
+  command: microk8s kubectl create namespace argocd --dry-run=client
+  register: ns_check
+  ignore_errors: true
+
+- name: Apply argocd namespace
+  shell: microk8s kubectl create namespace argocd
+  ignore_errors: true
 
 - name: Install ArgoCD
   command: >
